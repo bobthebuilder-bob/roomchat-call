@@ -8,7 +8,7 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-let activeRooms = {};
+let activeRooms = {}; // Sparar { id: { name, users, password } }
 app.use(express.static(__dirname));
 
 const htmlContent = `
@@ -19,6 +19,7 @@ const htmlContent = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RoomChat Ultimate</title>
     <link rel="icon" href="/IMG_0856.jpeg" type="image/jpeg">
+    <link rel="apple-touch-icon" href="/IMG_0856.jpeg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/socket.io/socket.io.js"></script>
@@ -39,9 +40,8 @@ const htmlContent = `
         #local-video-small { position: absolute; bottom: 115px; right: 15px; width: 85px; height: 135px; z-index: 160; border: 2px solid var(--accent); border-radius: 18px; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
         
         .controls { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 170; background: rgba(15, 23, 42, 0.95); padding: 16px; border-radius: 35px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(15px); }
-        .c-btn { width: 54px; height: 54px; border-radius: 20px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; color: white; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        .c-btn:active { transform: scale(0.9); }
-        .c-btn.btn-off { background: #ef4444 !important; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+        .c-btn { width: 54px; height: 54px; border-radius: 20px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; color: white; transition: all 0.2s; }
+        .c-btn.btn-off { background: #ef4444 !important; }
     </style>
 </head>
 <body>
@@ -57,13 +57,20 @@ const htmlContent = `
         </div>
     </div>
 
-    <div id="create-modal" class="hidden fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 backdrop-blur-sm">
-        <div class="glass w-full max-w-sm p-8 text-center border-white/10">
-            <h2 class="text-xl font-bold uppercase mb-6 italic tracking-widest text-purple-400">Nytt Samtal</h2>
-            <input id="room-name-in" type="text" placeholder="Rumsnamn..." class="w-full bg-black/50 p-4 rounded-2xl mb-6 border border-white/10 text-white text-center font-bold focus:border-purple-500 outline-none">
+    <div id="create-modal" class="hidden fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
+        <div class="glass w-full max-w-sm p-8 text-center">
+            <h2 class="text-xl font-bold uppercase mb-6 italic text-purple-400">Nytt Samtal</h2>
+            <input id="room-name-in" type="text" placeholder="Rumsnamn..." class="w-full bg-black/50 p-4 rounded-2xl mb-4 border border-white/10 text-white text-center font-bold">
+            
+            <div class="flex items-center justify-between mb-4 px-2">
+                <span class="text-xs font-bold text-slate-400">KRÄV LÖSENORD</span>
+                <input type="checkbox" id="pass-toggle" onchange="document.getElementById('room-pass-in').classList.toggle('hidden')">
+            </div>
+            <input id="room-pass-in" type="password" placeholder="Välj lösenord..." class="hidden w-full bg-black/50 p-4 rounded-2xl mb-6 border border-white/10 text-white text-center">
+            
             <div class="flex gap-3">
-                <button onclick="closeModals()" class="flex-1 p-4 text-slate-400 font-bold hover:text-white transition-colors">AVBRYT</button>
-                <button onclick="createRoom()" class="flex-1 btn-primary p-4 shadow-lg shadow-purple-500/20">STARTA</button>
+                <button onclick="closeModals()" class="flex-1 p-4 text-slate-400 font-bold">AVBRYT</button>
+                <button onclick="createRoom()" class="flex-1 btn-primary p-4">STARTA</button>
             </div>
         </div>
     </div>
@@ -84,53 +91,72 @@ const htmlContent = `
         let localStream = null;
         let peers = {};
         let currentFacing = 'user';
+        let currentRooms = {};
 
         function openCreateModal() { document.getElementById('create-modal').classList.remove('hidden'); }
         function closeModals() { document.getElementById('create-modal').classList.add('hidden'); }
 
         function createRoom() {
             const name = document.getElementById('room-name-in').value.trim();
+            const password = document.getElementById('pass-toggle').checked ? document.getElementById('room-pass-in').value : null;
             if(!name) return;
             const id = Math.random().toString(36).substr(2, 6).toUpperCase();
-            socket.emit('create-room', { id, name: name.toUpperCase() });
+            socket.emit('create-room', { id, name: name.toUpperCase(), password });
             closeModals();
-            joinRoom(id);
+            joinRoom(id, password);
         }
 
         socket.on('list-rooms', rooms => {
+            currentRooms = rooms;
             const list = document.getElementById('room-list');
             list.innerHTML = '';
             for (let id in rooms) {
                 const room = rooms[id];
                 const item = document.createElement('div');
                 item.className = 'glass p-6 flex justify-between items-center';
-                item.innerHTML = '<div><div class="font-bold uppercase tracking-tight">' + room.name + '</div><div class="text-[10px] font-bold text-purple-400 mt-1">' + room.users.length + '/5 DELTAGARE</div></div>';
+                item.innerHTML = \`<div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold uppercase">\${room.name}</span>
+                        \${room.hasPassword ? '<i data-lucide="lock" class="w-3 h-3 text-purple-500"></i>' : ''}
+                    </div>
+                    <div class="text-[10px] font-bold text-purple-400 mt-1">\${room.users.length}/5 DELTAGARE</div>
+                </div>\`;
+                
                 const btn = document.createElement('button');
-                btn.className = 'btn-primary px-6 py-2 text-[10px] tracking-widest';
+                btn.className = 'btn-primary px-6 py-2 text-[10px]';
                 btn.innerText = 'ANSLUT';
-                btn.onclick = () => joinRoom(id);
+                btn.onclick = () => {
+                    if(room.hasPassword) {
+                        const pass = prompt("Detta rum kräver lösenord:");
+                        if(pass) joinRoom(id, pass);
+                    } else {
+                        joinRoom(id);
+                    }
+                };
                 item.appendChild(btn);
                 list.appendChild(item);
             }
             lucide.createIcons();
         });
 
-        async function joinRoom(roomId) {
+        async function joinRoom(roomId, password = null) {
             try {
-                document.getElementById('lobby').style.display = 'none';
-                document.getElementById('video-container').style.display = 'block';
-
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: currentFacing }, 
-                    audio: true 
-                });
-                document.getElementById('local-video-small').srcObject = localStream;
-                socket.emit('join-room', roomId);
+                // Skicka lösenord till servern för koll
+                socket.emit('join-room', { roomId, password });
             } catch (err) {
-                alert("Kamerafel: " + err.message);
-                location.reload();
+                alert(err.message);
             }
         }
+
+        socket.on('room-access-granted', async (roomId) => {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('video-container').style.display = 'block';
+            localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacing }, audio: true });
+            document.getElementById('local-video-small').srcObject = localStream;
+            socket.emit('start-signal', roomId);
+        });
+
+        socket.on('error-msg', msg => alert(msg));
 
         socket.on('all-users', users => users.forEach(u => peers[u] = createPC(u, true)));
         socket.on('user-joined', d => peers[d.callerId] = createPC(d.callerId, false));
@@ -138,22 +164,15 @@ const htmlContent = `
         function createPC(userId, isOffer) {
             const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun1.l.google.com:19302' }] });
             localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-            
             pc.onicecandidate = e => e.candidate && socket.emit('signal', { to: userId, signal: { candidate: e.candidate } });
-            
             pc.ontrack = e => {
                 if(document.getElementById('wrap-'+userId)) return;
                 const wrap = document.createElement('div');
-                wrap.id = 'wrap-'+userId;
-                wrap.className = 'video-wrapper';
+                wrap.id = 'wrap-'+userId; wrap.className = 'video-wrapper';
                 const v = document.createElement('video');
-                v.srcObject = e.streams[0];
-                v.autoplay = true;
-                v.playsInline = true;
-                wrap.appendChild(v);
-                document.getElementById('grid').appendChild(wrap);
+                v.srcObject = e.streams[0]; v.autoplay = true; v.playsInline = true;
+                wrap.appendChild(v); document.getElementById('grid').appendChild(wrap);
             };
-
             if(isOffer) {
                 pc.onnegotiationneeded = async () => {
                     const offer = await pc.createOffer();
@@ -179,44 +198,36 @@ const htmlContent = `
         });
 
         function tM() {
-            const track = localStream.getAudioTracks()[0];
-            track.enabled = !track.enabled;
-            document.getElementById('m-btn').classList.toggle('btn-off', !track.enabled);
+            const t = localStream.getAudioTracks()[0];
+            t.enabled = !t.enabled;
+            document.getElementById('m-btn').classList.toggle('btn-off', !t.enabled);
         }
 
         function tV() {
-            const track = localStream.getVideoTracks()[0];
-            track.enabled = !track.enabled;
-            document.getElementById('v-btn').classList.toggle('btn-off', !track.enabled);
+            const t = localStream.getVideoTracks()[0];
+            t.enabled = !t.enabled;
+            document.getElementById('v-btn').classList.toggle('btn-off', !t.enabled);
         }
 
         async function flipCam() {
             if (!localStream) return;
             currentFacing = currentFacing === 'user' ? 'environment' : 'user';
+            const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacing }, audio: true });
+            const newVideoTrack = newStream.getVideoTracks()[0];
             
-            const newStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: currentFacing }, 
-                audio: true 
-            });
-            
-            const videoTrack = newStream.getVideoTracks()[0];
             for (let id in peers) {
                 const sender = peers[id].getSenders().find(s => s.track && s.track.kind === 'video');
-                if (sender) sender.replaceTrack(videoTrack);
+                if (sender) sender.replaceTrack(newVideoTrack);
             }
             
             localStream.getVideoTracks()[0].stop();
             localStream = newStream;
-            const localVid = document.getElementById('local-video-small');
-            localVid.srcObject = newStream;
-            localVid.classList.toggle('mirrored', currentFacing === 'user');
+            document.getElementById('local-video-small').srcObject = newStream;
+            document.getElementById('local-video-small').classList.toggle('mirrored', currentFacing === 'user');
         }
 
         socket.on('user-left', id => {
-            if(peers[id]) {
-                peers[id].close();
-                delete peers[id];
-            }
+            if(peers[id]) { peers[id].close(); delete peers[id]; }
             const el = document.getElementById('wrap-'+id);
             if(el) el.remove();
         });
@@ -230,22 +241,45 @@ const htmlContent = `
 app.get('/', (req, res) => res.send(htmlContent));
 
 io.on('connection', (socket) => {
-    socket.emit('list-rooms', activeRooms);
+    // Skicka lista men dölj lösenorden
+    const getSafeRooms = () => {
+        let safe = {};
+        for(let id in activeRooms) {
+            safe[id] = { 
+                name: activeRooms[id].name, 
+                users: activeRooms[id].users, 
+                hasPassword: !!activeRooms[id].password 
+            };
+        }
+        return safe;
+    };
+
+    socket.emit('list-rooms', getSafeRooms());
 
     socket.on('create-room', d => {
-        activeRooms[d.id] = { name: d.name, users: [] };
-        io.emit('list-rooms', activeRooms);
+        activeRooms[d.id] = { name: d.name, password: d.password, users: [] };
+        io.emit('list-rooms', getSafeRooms());
     });
 
-    socket.on('join-room', rid => {
-        if(!activeRooms[rid]) return;
-        socket.emit('all-users', activeRooms[rid].users);
-        if (!activeRooms[rid].users.includes(socket.id)) {
-            activeRooms[rid].users.push(socket.id);
+    socket.on('join-room', ({ roomId, password }) => {
+        const room = activeRooms[roomId];
+        if(!room) return socket.emit('error-msg', 'Rummet finns inte längre.');
+        
+        if(room.password && room.password !== password) {
+            return socket.emit('error-msg', 'Fel lösenord!');
         }
+
+        socket.emit('room-access-granted', roomId);
+    });
+
+    socket.on('start-signal', rid => {
+        const room = activeRooms[rid];
+        if(!room) return;
+        socket.emit('all-users', room.users);
+        room.users.push(socket.id);
         socket.join(rid);
         socket.to(rid).emit('user-joined', { callerId: socket.id });
-        io.emit('list-rooms', activeRooms); // Uppdaterar rumslistan för alla så det står 1/5, 2/5 etc.
+        io.emit('list-rooms', getSafeRooms());
     });
 
     socket.on('signal', d => io.to(d.to).emit('signal', { from: socket.id, signal: d.signal }));
@@ -255,13 +289,11 @@ io.on('connection', (socket) => {
             if (activeRooms[rid].users.includes(socket.id)) {
                 activeRooms[rid].users = activeRooms[rid].users.filter(u => u !== socket.id);
                 socket.to(rid).emit('user-left', socket.id);
-                if (activeRooms[rid].users.length === 0) {
-                    delete activeRooms[rid];
-                }
-                io.emit('list-rooms', activeRooms);
+                if (activeRooms[rid].users.length === 0) delete activeRooms[rid];
+                io.emit('list-rooms', getSafeRooms());
             }
         }
     });
 });
 
-server.listen(PORT, '0.0.0.0', () => console.log('RoomChat är igång på port ' + PORT));
+server.listen(PORT, '0.0.0.0', () => console.log('Server körs på port ' + PORT));

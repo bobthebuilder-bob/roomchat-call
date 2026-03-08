@@ -1,7 +1,6 @@
 {
   "name": "roomchat-call",
   "version": "1.0.0",
-  "description": "Videochatt-server för iPad",
   "main": "server.js",
   "dependencies": {
     "express": "^4.18.2",
