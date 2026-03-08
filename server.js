@@ -19,29 +19,29 @@ const htmlContent = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RoomChat Ultimate</title>
     <link rel="icon" href="/IMG_0856.jpeg" type="image/jpeg">
-    <link rel="apple-touch-icon" href="/IMG_O856.jpeg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-        :root { --bg: #05070f; --accent: #7c4dff; --card: #0d111d; }
+        :root { --bg: #05070f; --accent: #7c4dff; --card: #111420; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg); color: white; margin: 0; overflow: hidden; }
         .logo-title { font-size: 42px; font-weight: 800; font-style: italic; text-transform: uppercase; background: linear-gradient(to bottom, #a78bfa, #7c4dff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .glass { background: var(--card); border: 1px solid rgba(255,255,255,0.05); border-radius: 30px; }
         .btn-primary { background: var(--accent); border-radius: 25px; color: white; font-weight: bold; }
         
         #video-container { position: fixed; inset: 0; background: #000; display: none; z-index: 100; padding: 10px; }
-        .video-grid { display: grid; gap: 10px; width: 100%; height: calc(100% - 130px); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: center; justify-items: center; }
-        .video-wrapper { position: relative; width: 100%; height: 100%; max-width: 450px; aspect-ratio: 9 / 16; border-radius: 24px; overflow: hidden; background: #111; border: 1px solid rgba(255,255,255,0.1); }
+        .video-grid { display: grid; gap: 10px; width: 100%; height: calc(100% - 130px); grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); align-items: center; justify-items: center; }
+        .video-wrapper { position: relative; width: 100%; height: 100%; max-width: 450px; aspect-ratio: 9 / 16; border-radius: 24px; overflow: hidden; background: #0a0a0a; border: 1px solid rgba(255,255,255,0.1); }
         video { width: 100%; height: 100%; object-fit: cover !important; }
         .mirrored { transform: scaleX(-1); }
         
-        #local-video-small { position: absolute; bottom: 120px; right: 15px; width: 90px; height: 140px; z-index: 160; border: 2px solid var(--accent); border-radius: 18px; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #local-video-small { position: absolute; bottom: 115px; right: 15px; width: 85px; height: 135px; z-index: 160; border: 2px solid var(--accent); border-radius: 18px; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
         
-        .controls { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 170; background: rgba(15, 23, 42, 0.9); padding: 16px; border-radius: 35px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); }
-        .c-btn { width: 54px; height: 54px; border-radius: 20px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; color: white; transition: all 0.2s; }
-        .c-btn.btn-off { background: #ef4444 !important; } /* Röd färg när avstängd */
+        .controls { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 170; background: rgba(15, 23, 42, 0.95); padding: 16px; border-radius: 35px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(15px); }
+        .c-btn { width: 54px; height: 54px; border-radius: 20px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; color: white; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .c-btn:active { transform: scale(0.9); }
+        .c-btn.btn-off { background: #ef4444 !important; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
     </style>
 </head>
 <body>
@@ -49,7 +49,7 @@ const htmlContent = `
         <h1 class="logo-title">ROOMCHAT</h1>
         <p class="text-[10px] tracking-[0.4em] font-bold text-slate-500 mb-8 uppercase">Universal Camera Edition</p>
         <div class="w-full max-w-md space-y-4">
-            <button onclick="openCreateModal()" class="btn-primary w-full p-6 flex justify-between items-center shadow-xl">
+            <button onclick="openCreateModal()" class="btn-primary w-full p-6 flex justify-between items-center shadow-2xl">
                 <span>SKAPA SAMTAL</span>
                 <i data-lucide="plus"></i>
             </button>
@@ -57,13 +57,13 @@ const htmlContent = `
         </div>
     </div>
 
-    <div id="create-modal" class="hidden fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-        <div class="glass w-full max-w-sm p-8 text-center">
-            <h2 class="text-xl font-bold uppercase mb-6 italic">Nytt Samtal</h2>
-            <input id="room-name-in" type="text" placeholder="Rumsnamn..." class="w-full bg-black p-4 rounded-2xl mb-6 border border-white/10 text-white text-center font-bold">
-            <div class="flex gap-2">
-                <button onclick="closeModals()" class="flex-1 p-4 text-slate-400 font-bold">AVBRYT</button>
-                <button onclick="createRoom()" class="flex-1 btn-primary p-4">STARTA</button>
+    <div id="create-modal" class="hidden fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 backdrop-blur-sm">
+        <div class="glass w-full max-w-sm p-8 text-center border-white/10">
+            <h2 class="text-xl font-bold uppercase mb-6 italic tracking-widest text-purple-400">Nytt Samtal</h2>
+            <input id="room-name-in" type="text" placeholder="Rumsnamn..." class="w-full bg-black/50 p-4 rounded-2xl mb-6 border border-white/10 text-white text-center font-bold focus:border-purple-500 outline-none">
+            <div class="flex gap-3">
+                <button onclick="closeModals()" class="flex-1 p-4 text-slate-400 font-bold hover:text-white transition-colors">AVBRYT</button>
+                <button onclick="createRoom()" class="flex-1 btn-primary p-4 shadow-lg shadow-purple-500/20">STARTA</button>
             </div>
         </div>
     </div>
@@ -104,9 +104,9 @@ const htmlContent = `
                 const room = rooms[id];
                 const item = document.createElement('div');
                 item.className = 'glass p-6 flex justify-between items-center';
-                item.innerHTML = '<div><div class="font-bold uppercase">' + room.name + '</div><div class="text-[10px] text-purple-400">' + room.users.length + '/5 DELTAGARE</div></div>';
+                item.innerHTML = '<div><div class="font-bold uppercase tracking-tight">' + room.name + '</div><div class="text-[10px] font-bold text-purple-400 mt-1">' + room.users.length + '/5 DELTAGARE</div></div>';
                 const btn = document.createElement('button');
-                btn.className = 'btn-primary px-6 py-2 text-[10px]';
+                btn.className = 'btn-primary px-6 py-2 text-[10px] tracking-widest';
                 btn.innerText = 'ANSLUT';
                 btn.onclick = () => joinRoom(id);
                 item.appendChild(btn);
@@ -132,7 +132,6 @@ const htmlContent = `
             }
         }
 
-        // WebRTC Hantering
         socket.on('all-users', users => users.forEach(u => peers[u] = createPC(u, true)));
         socket.on('user-joined', d => peers[d.callerId] = createPC(d.callerId, false));
 
@@ -179,7 +178,6 @@ const htmlContent = `
             }
         });
 
-        // Knapp-funktioner med färgändring
         function tM() {
             const track = localStream.getAudioTracks()[0];
             track.enabled = !track.enabled;
@@ -203,7 +201,7 @@ const htmlContent = `
             
             const videoTrack = newStream.getVideoTracks()[0];
             for (let id in peers) {
-                const sender = peers[id].getSenders().find(s => s.track.kind === 'video');
+                const sender = peers[id].getSenders().find(s => s.track && s.track.kind === 'video');
                 if (sender) sender.replaceTrack(videoTrack);
             }
             
@@ -214,7 +212,6 @@ const htmlContent = `
             localVid.classList.toggle('mirrored', currentFacing === 'user');
         }
 
-        // Ta bort användare när de lämnar
         socket.on('user-left', id => {
             if(peers[id]) {
                 peers[id].close();
@@ -243,9 +240,12 @@ io.on('connection', (socket) => {
     socket.on('join-room', rid => {
         if(!activeRooms[rid]) return;
         socket.emit('all-users', activeRooms[rid].users);
-        activeRooms[rid].users.push(socket.id);
+        if (!activeRooms[rid].users.includes(socket.id)) {
+            activeRooms[rid].users.push(socket.id);
+        }
         socket.join(rid);
         socket.to(rid).emit('user-joined', { callerId: socket.id });
+        io.emit('list-rooms', activeRooms); // Uppdaterar rumslistan för alla så det står 1/5, 2/5 etc.
     });
 
     socket.on('signal', d => io.to(d.to).emit('signal', { from: socket.id, signal: d.signal }));
@@ -254,12 +254,14 @@ io.on('connection', (socket) => {
         for (let rid in activeRooms) {
             if (activeRooms[rid].users.includes(socket.id)) {
                 activeRooms[rid].users = activeRooms[rid].users.filter(u => u !== socket.id);
-                if (activeRooms[rid].users.length === 0) delete activeRooms[rid];
-                io.emit('list-rooms', activeRooms);
                 socket.to(rid).emit('user-left', socket.id);
+                if (activeRooms[rid].users.length === 0) {
+                    delete activeRooms[rid];
+                }
+                io.emit('list-rooms', activeRooms);
             }
         }
     });
 });
 
-server.listen(PORT, '0.0.0.0', () => console.log('RoomChat körs på port ' + PORT));
+server.listen(PORT, '0.0.0.0', () => console.log('RoomChat är igång på port ' + PORT));
